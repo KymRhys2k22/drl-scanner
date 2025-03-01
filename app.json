@@ -23,7 +23,7 @@
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"
       ],
-      "package": "com.kymrhys.pricecheckeritem"
+      "package": "com.kymrhys.dlrscanner"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -41,7 +41,7 @@
     "owner": "kymrhys",
     "extra": {
       "eas": {
-        "projectId": "68e9c7cb-5d9e-48b9-b5c2-97ddca020c17"
+        "projectId": "1146814d-1efe-4f36-b217-fb2bfd40bf21"
       }
     }
   }

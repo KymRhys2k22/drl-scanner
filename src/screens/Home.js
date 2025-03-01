@@ -38,12 +38,16 @@ const Home = () => {
           paddingHorizontal: 20,
           paddingBottom: 20,
         }}>
-        <Text>version 1.0.0{"\n"}</Text>
+        <Text>version 3.0.0{"\n"}</Text>
         <Text>
           <Text style={{ fontWeight: "bold" }}>
             Here’s an improved version:
           </Text>
           {"\n"}
+          {"\n"}
+          -You can now view the department of each item.
+          {"\n"}
+          -You can now search for items by typing in the search bar.
           {"\n"}
           -You can now click on the UPC and SKU to search directly on Google
           Images.{"\n"}

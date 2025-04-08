@@ -14,7 +14,8 @@ import {
   Alert,
 } from "react-native";
 import { BarCodeScanner } from "expo-barcode-scanner";
-import Items from "../item.json";
+import Feather from "@expo/vector-icons/Feather";
+import Items from "../itemss.json";
 import { StatusBar } from "expo-status-bar";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
@@ -24,6 +25,7 @@ export default function BarCodeItemScanner() {
   const [modalVisible, setModalVisible] = useState(false);
   const [results, setResults] = useState({});
   const [manualInput, setManualInput] = useState("");
+  const [camera, setCamera] = useState(true);
 
   useEffect(() => {
     Items.map((item) => {
@@ -174,11 +176,30 @@ export default function BarCodeItemScanner() {
       keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 120}
       behavior="padding"
       style={styles.container}>
-      <BarCodeScanner
-        BarCodeBounds
-        onBarCodeScanned={scanned ? undefined : handleBarCodeScanned}
-        style={StyleSheet.absoluteFillObject}
-      />
+      {camera && (
+        <BarCodeScanner
+          BarCodeBounds
+          onBarCodeScanned={scanned ? undefined : handleBarCodeScanned}
+          style={StyleSheet.absoluteFillObject}
+        />
+      )}
+
+      <Pressable
+        onPress={() => setCamera(!camera)}
+        style={{
+          position: "absolute",
+          top: 100,
+          right: 20,
+          zIndex: 1,
+
+          padding: 10,
+        }}>
+        {camera ? (
+          <Feather name="camera" size={42} color="white" />
+        ) : (
+          <Feather name="camera-off" size={42} color="white" />
+        )}
+      </Pressable>
 
       {scanned && !modalVisible && (
         <View

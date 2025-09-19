@@ -15,9 +15,9 @@ import {
 } from "react-native";
 import { BarCodeScanner } from "expo-barcode-scanner";
 import Feather from "@expo/vector-icons/Feather";
-import Items from "../itemss.json";
 import { StatusBar } from "expo-status-bar";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function BarCodeItemScanner() {
   const [hasPermission, setHasPermission] = useState(null);
@@ -26,13 +26,38 @@ export default function BarCodeItemScanner() {
   const [results, setResults] = useState({});
   const [manualInput, setManualInput] = useState("");
   const [camera, setCamera] = useState(true);
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
 
+  // Fetch items from API with caching
   useEffect(() => {
-    Items.map((item) => {
-      if (item.SKU === 4549131484427 || item.UPC === 4549131484427) {
-        console.table(item);
+    const fetchItems = async () => {
+      try {
+        // Try to load from cache first
+        const cachedData = await AsyncStorage.getItem("itemsCache");
+        if (cachedData) {
+          setItems(JSON.parse(cachedData));
+          setLoading(false);
+        }
+
+        // Always try to update from API in background
+        const res = await fetch("https://sheetdb.io/api/v1/pnhhegaw3olc5");
+        const data = await res.json();
+
+        if (data.length > 0) {
+          setItems(data);
+          await AsyncStorage.setItem("itemsCache", JSON.stringify(data));
+        }
+      } catch (error) {
+        console.error("Error fetching items:", error);
+        if (!items.length) {
+          Alert.alert("Error", "Failed to load items from API or cache");
+        }
+      } finally {
+        setLoading(false);
       }
-    });
+    };
+    fetchItems();
   }, []);
 
   const department = (results) => {
@@ -110,63 +135,50 @@ export default function BarCodeItemScanner() {
       const { status } = await BarCodeScanner.requestPermissionsAsync();
       setHasPermission(status === "granted");
     };
-
     getBarCodeScannerPermissions();
   }, []);
 
+  const searchItem = (code) => {
+    const match = items.find((item) => item.SKU === code || item.UPC === code);
+    if (match) {
+      setModalVisible(true);
+      setResults(match);
+    } else {
+      setModalVisible(false);
+    }
+  };
+
   const handleBarCodeScanned = ({ data }) => {
     setScanned(true);
-
-    //**map items file from json and filter
-
-    const result = () =>
-      Items.filter((item) => item.SKU === data || item.UPC === data).map(
-        (items) => {
-          setModalVisible(true);
-          setResults(items);
-        }
-      );
-
-    result();
+    searchItem(data);
   };
 
   const handleManualInput = ({ data }) => {
-    if (!data) {
-      return;
-    }
+    if (!data) return;
     setScanned(true);
-    //**map items file from json and filter
-
-    const result = () =>
-      Items.filter((item) => item.SKU === data || item.UPC === data).map(
-        (items) => {
-          setModalVisible(true);
-          setResults(items);
-        }
-      );
-
-    result();
+    searchItem(data);
   };
 
-  if (hasPermission === null) {
+  if (loading) {
     return (
-      <View
-        style={{
-          flex: 1,
-          justifyContent: "center",
-          alignContent: "center",
-        }}>
-        <Text
-          style={{
-            textAlign: "center",
-            fontSize: 24,
-            flexDirection: "row",
-          }}>
-          Requesting for camera permission <ActivityIndicator size="large" />{" "}
+      <View style={{ flex: 1, justifyContent: "center", alignContent: "center" }}>
+        <Text style={{ textAlign: "center", fontSize: 24 }}>
+          Loading items <ActivityIndicator size="large" />
         </Text>
       </View>
     );
   }
+
+  if (hasPermission === null) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignContent: "center" }}>
+        <Text style={{ textAlign: "center", fontSize: 24 }}>
+          Requesting for camera permission <ActivityIndicator size="large" />
+        </Text>
+      </View>
+    );
+  }
+
   if (hasPermission === false) {
     return <Text>No access to camera</Text>;
   }
@@ -175,10 +187,10 @@ export default function BarCodeItemScanner() {
     <KeyboardAvoidingView
       keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 120}
       behavior="padding"
-      style={styles.container}>
+      style={styles.container}
+    >
       {camera && (
         <BarCodeScanner
-          BarCodeBounds
           onBarCodeScanned={scanned ? undefined : handleBarCodeScanned}
           style={StyleSheet.absoluteFillObject}
         />
@@ -186,14 +198,8 @@ export default function BarCodeItemScanner() {
 
       <Pressable
         onPress={() => setCamera(!camera)}
-        style={{
-          position: "absolute",
-          top: 100,
-          right: 20,
-          zIndex: 1,
-
-          padding: 10,
-        }}>
+        style={{ position: "absolute", top: 100, right: 20, zIndex: 1, padding: 10 }}
+      >
         {camera ? (
           <Feather name="camera" size={42} color="white" />
         ) : (
@@ -202,115 +208,78 @@ export default function BarCodeItemScanner() {
       </Pressable>
 
       {scanned && !modalVisible && (
-        <View
-          style={{
-            paddingVertical: 10,
-            paddingHorizontal: 20,
-            borderRadius: 20,
-          }}>
-          <Text
-            style={{
-              textAlign: "center",
-              fontSize: 20,
-              fontWeight: "bold",
-              color: "#fff",
-            }}>
+        <View style={{ paddingVertical: 10, paddingHorizontal: 20, borderRadius: 20 }}>
+          <Text style={{ textAlign: "center", fontSize: 20, fontWeight: "bold", color: "#fff" }}>
             <Text style={{ fontSize: 30 }}>⚠️</Text> NO RECORD
           </Text>
         </View>
       )}
+
       <MaterialCommunityIcons
         style={{ top: -8, left: 1 }}
         name="scan-helper"
         size={300}
         color="#FCC56B"
       />
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={modalVisible}
-        onRequestClose={() => {
-          Alert.alert("Modal has been closed.");
-          setModalVisible(!modalVisible);
-        }}>
+
+      {/* Modal */}
+      <Modal animationType="slide" transparent={true} visible={modalVisible}>
         <View style={styles.centeredView}>
           <View style={styles.modalView}>
             <Text style={styles.modalText}>
-              Description:
-              <Text style={styles.modalTextResult}>
-                {`\n`}
-                {results.Description}
-              </Text>
+              Description:{"\n"}
+              <Text style={styles.modalTextResult}>{results.Description}</Text>
             </Text>
             <Text style={styles.modalText}>
-              Department:
+              Department:{"\n"}
               <Text style={styles.modalTextResult}>
-                {`\n`}
-
                 {department(results.Department)}
               </Text>
             </Text>
             <Text style={styles.modalText}>
-              Sub Department:
+              Sub Department:{"\n"}
               <Text style={styles.modalTextResult}>
-                {`\n`}
-
                 {department(results["Sub Dep"])}
               </Text>
             </Text>
             <Text style={styles.modalText}>
-              UPC:{`\n`}
+              UPC:{"\n"}
               <TouchableOpacity
-                onPress={() => {
-                  Linking.openURL(
-                    `https://www.google.com/search?tbm=isch&q=${results.SKU}`
-                  );
-                }}>
+                onPress={() =>
+                  Linking.openURL(`https://www.google.com/search?tbm=isch&q=${results.SKU}`)
+                }
+              >
                 <Text style={styles.modalTextResult}>
-                  {results.SKU}
-                  <MaterialCommunityIcons
-                    className="animate-spin"
-                    name="image-search-outline"
-                    size={24}
-                    color="pink"
-                  />
+                  {results.SKU}{" "}
+                  <MaterialCommunityIcons name="image-search-outline" size={24} color="pink" />
                 </Text>
               </TouchableOpacity>
             </Text>
             <Text style={styles.modalText}>
-              SKU:{`\n`}
+              SKU:{"\n"}
               <TouchableOpacity
-                onPress={() => {
-                  Linking.openURL(
-                    `https://www.google.com/search?tbm=isch&q=${results.UPC}`
-                  );
-                }}>
-                <View className="">
-                  <Text style={styles.modalTextResult}>
-                    {results.UPC}{" "}
-                    <MaterialCommunityIcons
-                      name="image-search-outline"
-                      size={24}
-                      color="pink"
-                    />
-                  </Text>
-                </View>
+                onPress={() =>
+                  Linking.openURL(`https://www.google.com/search?tbm=isch&q=${results.UPC}`)
+                }
+              >
+                <Text style={styles.modalTextResult}>
+                  {results.UPC}{" "}
+                  <MaterialCommunityIcons name="image-search-outline" size={24} color="pink" />
+                </Text>
               </TouchableOpacity>
             </Text>
             <Text style={styles.modalText}>
-              Price:
-              <Text style={styles.modalTextResult}>
-                {`\n`}₱{results.Price}
-              </Text>
+              Price:{"\n"}₱{results.Price}
             </Text>
             <Pressable
               style={[styles.button, styles.buttonClose]}
               onPress={() => {
                 setScanned(false);
-                setModalVisible(!modalVisible);
+                setModalVisible(false);
                 setResults({});
                 setManualInput("");
-              }}>
+              }}
+            >
               <Text style={styles.textStyle}>Tap to Scan Again</Text>
             </Pressable>
             <Text style={{ fontSize: 12, color: "gray", textAlign: "center" }}>
@@ -328,18 +297,14 @@ export default function BarCodeItemScanner() {
             paddingHorizontal: 20,
             borderRadius: 20,
           }}
-          onPress={() => setScanned(false)}>
-          <Text
-            style={{
-              textAlign: "center",
-              fontSize: 20,
-              fontWeight: "bold",
-              color: "#fff",
-            }}>
+          onPress={() => setScanned(false)}
+        >
+          <Text style={{ textAlign: "center", fontSize: 20, fontWeight: "bold", color: "#fff" }}>
             SCAN/INPUT AGAIN
           </Text>
         </TouchableOpacity>
       )}
+
       <View style={styles.manualInput}>
         <TextInput
           style={{ fontSize: 24, width: "90%" }}
@@ -366,7 +331,6 @@ export default function BarCodeItemScanner() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "#252525",
@@ -384,10 +348,7 @@ const styles = StyleSheet.create({
     padding: 35,
     alignItems: "center",
     shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
@@ -397,9 +358,6 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     paddingHorizontal: 30,
     elevation: 2,
-  },
-  buttonOpen: {
-    backgroundColor: "#F194FF",
   },
   buttonClose: {
     backgroundColor: "#2196F3",
@@ -435,10 +393,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
